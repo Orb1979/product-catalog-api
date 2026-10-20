@@ -53,12 +53,30 @@ The pricing synchronization cursor starts at the Unix epoch.
 
 ```bash
 curl 'http://localhost:8080/api/products?page=0&size=20'
+curl 'http://localhost:8080/api/products?q=blue%20jacket&page=0&size=20'
 curl http://localhost:8080/api/products/SKU-000001
 ```
 
-Pages are zero-based, sorted by SKU, and limited to 100 products (default 20).
-Missing products return 404; invalid pagination returns 400, both as ProblemDetail.
+Pages are zero-based and limited to 100 products (default 20).
+
+Without `q`, or with blank input, products are sorted by SKU. Searches are ranked by relevance, then SKU. 
+Search covers name, brand, category, description, and JSON attribute keys/values, not SKU, price, or currency.
+
+#### PostgreSQL’s full-text search functions
+Search is case-insensitive and token-based (not substring or typo matching). Words are combined with AND.\
+use `"city lamp"` for a phrase \
+use `lamp OR jacket` for alternatives \
+use `jacket -blue`to exclude a term
+
+
+Missing products return 404; invalid pagination returns 400, both as ProblemDetail. \
 Swagger UI: http://localhost:8080/swagger-ui/index.html
+
+To check search response time locally:
+
+```bash
+curl -s -o /dev/null -w '%{time_total}s\n' 'http://localhost:8080/api/products?q=blue%20jacket'
+```
 
 ### Database configuration
 

@@ -10,6 +10,9 @@ import org.example.productcatalogapi.model.Product;
 import org.example.productcatalogapi.repository.ProductRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.NullSource;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -33,27 +36,39 @@ class ProductServiceTest {
 
     @Test
     void shouldMapProductToResponse() {
-        Product product = new Product("SKU-000001", "Lamp", "Desk lamp", "Acme",
-                "Home", Map.of("color", "blue"));
+        Product product = new Product("SKU-000001", "Lamp", "Desk lamp", "Phillips", "Home", Map.of("color", "blue"));
         when(repository.findById("SKU-000001")).thenReturn(Optional.of(product));
 
         ProductResponse response = service.getProduct("SKU-000001");
 
-        assertThat(response).isEqualTo(new ProductResponse("SKU-000001", "Lamp",
-                "Desk lamp", "Acme", "Home", Map.of("color", "blue"), null, null, null));
+        assertThat(response).isEqualTo(new ProductResponse(
+            "SKU-000001", "Lamp", "Desk lamp", "Phillips", "Home", Map.of("color", "blue"), null, null, null));
     }
 
-    @Test
-    void shouldReturnRequestedPageOrderedBySku() {
+    @ParameterizedTest
+    @NullSource
+    @ValueSource(strings = {"", "   "})
+    void shouldListProductsOrderedBySkuWhenQueryIsBlank(String query) {
         PageRequest request = PageRequest.of(1, 10, Sort.by("sku"));
         Product product = new Product("SKU-000011", "Lamp", null, null, null, Map.of());
         when(repository.findAll(request)).thenReturn(new PageImpl<>(List.of(product), request, 21));
 
-        Page<ProductResponse> response = service.getProducts(1, 10);
+        Page<ProductResponse> response = service.getProducts(query, 1, 10);
 
         assertThat(response.getContent()).extracting(ProductResponse::sku).containsExactly("SKU-000011");
         assertThat(response.getNumber()).isEqualTo(1);
         assertThat(response.getTotalElements()).isEqualTo(21);
+    }
+
+    @Test
+    void shouldSearchWithTrimmedQuery() {
+        PageRequest request = PageRequest.of(0, 20);
+        Product product = new Product("SKU-000001", "Lamp", null, null, null, Map.of());
+        when(repository.search("lamp", request)).thenReturn(new PageImpl<>(List.of(product)));
+
+        Page<ProductResponse> response = service.getProducts("  lamp  ", 0, 20);
+
+        assertThat(response.getContent()).extracting(ProductResponse::sku).containsExactly("SKU-000001");
     }
 
     @Test

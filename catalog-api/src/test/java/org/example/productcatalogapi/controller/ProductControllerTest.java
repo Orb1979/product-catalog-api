@@ -39,7 +39,7 @@ class ProductControllerTest {
 
     @Test
     void shouldReturnDefaultProductPage() throws Exception {
-        when(service.getProducts(0, 20)).thenReturn(
+        when(service.getProducts(null, 0, 20)).thenReturn(
                 new PageImpl<>(List.of(PRODUCT), PageRequest.of(0, 20), 1));
 
         mvc.perform(get("/api/products"))
@@ -48,6 +48,18 @@ class ProductControllerTest {
                 .andExpect(jsonPath("$.page.number").value(0))
                 .andExpect(jsonPath("$.page.size").value(20))
                 .andExpect(jsonPath("$.page.totalElements").value(1));
+    }
+
+    @Test
+    void shouldPassSearchQueryAndPaginationToService() throws Exception {
+        when(service.getProducts("lamp", 1, 2)).thenReturn(
+                new PageImpl<>(List.of(PRODUCT), PageRequest.of(1, 2), 3));
+
+        mvc.perform(get("/api/products").param("q", "lamp").param("page", "1").param("size", "2"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content[0].sku").value("SKU-000001"))
+                .andExpect(jsonPath("$.page.number").value(1))
+                .andExpect(jsonPath("$.page.totalElements").value(3));
     }
 
     @Test

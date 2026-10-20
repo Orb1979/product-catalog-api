@@ -21,8 +21,11 @@ public class ProductController {
     private final ProductService service;
 
     @GetMapping
-    @Operation(summary = "List products ordered by SKU")
+    @Operation(summary = "List products or search their characteristics",
+            description = "Search name, brand, category, description, and JSON attributes. "
+                    + "Search results are ordered by relevance, then SKU; blank searches list all products by SKU.")
     public PagedModel<ProductResponse> getProducts(
+            @RequestParam(name = "q", required = false) String query,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
 
@@ -30,7 +33,7 @@ public class ProductController {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "page must be non-negative and size must be between 1 and 100.");
         }
-        return new PagedModel<>(service.getProducts(page, size));
+        return new PagedModel<>(service.getProducts(query, page, size));
     }
 
     @GetMapping("/{sku}")
