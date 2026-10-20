@@ -1,1 +1,3 @@
 rootProject.name = 'product-catalog-api'
+
+include 'catalog-api', 'mock-pricing-system'
