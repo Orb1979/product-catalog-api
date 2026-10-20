@@ -1,6 +1,12 @@
 # Product catalog API
 
-A product catalog assignment built incrementally as two Spring Boot applications.
+A product catalog application for searching and browsing 10,000 products with automatically synchronized prices. The complete application runs with Docker Compose.
+
+- **Catalog API:** A Spring Boot REST API with PostgreSQL-backed full-text search, sorting, and pagination.
+- **Mock pricing system:** A separate Spring Boot application that simulates an external pricing service with changing product prices.
+- **Price polling:** The catalog periodically pulls price changes from the pricing service and persists them together with the synchronization cursor. Timeouts, retries, and a circuit breaker handle external failures.
+
+An example React frontend demonstrates searching, sorting, and browsing the catalog, with automatic price refresh.
 
 ## Requirements
 - JDK 21 (for local development and Gradle tests)
@@ -12,7 +18,7 @@ A product catalog assignment built incrementally as two Spring Boot applications
 | --- | --- | --- |
 | `catalog-api` | Product catalog REST API | 8080 |
 | `mock-pricing-system` | Mock external pricing system | 8081 |
-| `frontend` | React product table (local development) | 5173 |
+| `frontend` | React product table | 3000 (Docker), 5173 (local) |
 
 
 ## Build and test
@@ -34,19 +40,25 @@ Run a single module's tests:
 docker compose up --build
 ```
 
-This starts PostgreSQL, the mock pricing system, and the catalog API. The catalog
-waits for PostgreSQL to be healthy, applies migrations, and then starts polling
-prices. Products may have null prices until the first sync finishes.
+This starts PostgreSQL, the mock pricing system, the catalog API, and the frontend. \
+The catalog waits for PostgreSQL to be healthy, applies migrations, and then starts polling prices. \
+Products may have null prices until the first sync finishes.
+
 
 - Catalog API: http://localhost:8080/api/products
 - Swagger UI: http://localhost:8080/swagger-ui/index.html
 - Mock pricing: http://localhost:8081/api/prices
+- Frontend: http://localhost:3000
 
 Stop the stack with `docker compose down`. Database data stays in its named volume.
-If ports are occupied, set `CATALOG_PORT`, `MOCK_PRICING_PORT`, or `DB_PORT`, for example:
+
+The frontend serves a production build through Nginx and proxies `/api` to the
+catalog container; no local Node.js installation or CORS setup is needed.
+
+If ports are occupied, set `FRONTEND_PORT`, `CATALOG_PORT`, `MOCK_PRICING_PORT`, or `DB_PORT`, for example:
 
 ```bash
-CATALOG_PORT=18080 MOCK_PRICING_PORT=18081 DB_PORT=55432 docker compose up --build
+FRONTEND_PORT=13000 CATALOG_PORT=18080 MOCK_PRICING_PORT=18081 DB_PORT=55432 docker compose up --build
 ```
 
 These overrides only change host ports; containers use the internal service addresses.
@@ -59,53 +71,48 @@ If switching from the full Docker stack, stop its application containers first:
 docker compose stop catalog-api mock-pricing
 ```
 
-Start PostgreSQL and wait until it is healthy:
-
+Start PostgreSQL:
 ```bash
 docker compose up -d --wait postgres
 ```
 
-In separate terminals:
-
+run the mock pricing system: 
 ```bash
 ./gradlew :mock-pricing-system:bootRun
 ```
 
+run the catalog API:
 ```bash
 ./gradlew :catalog-api:bootRun
 ```
 
-The catalog applies Flyway migrations on startup and validates its JPA mapping against the schema. 
-The database includes 10,000 demo products.
-The pricing synchronization cursor starts at the Unix epoch.
+The catalog applies Flyway migrations on startup and validates its JPA mapping against the schema. \
+The database includes 10,000 demo products.\
+The pricing synchronization cursor starts at the Unix epoch.\
 
-## Frontend (local development)
-
-Requires Node.js 22.12 or newer. 
-Start the catalog API locally or in Docker,
-then run the frontend separately:
-
+Start Frontend: \
+(Requires Node.js 22.12 or newer)
 ```bash
-cd frontend
 # install dependencies (only once) 
-npm install
+npm --prefix frontend install
 # run the development server
-npm run dev
+npm --prefix frontend run dev
 # run tests
-npm test
+npm --prefix frontend test  
+# browser 
+http://localhost:5173
 ```
 
-Open http://localhost:5173. Search, sorting, and pagination use the server API;
-prices refresh every five seconds. Click column headers to sort and use **Reset
-sort** to restore the default order.
+Search, sorting, and pagination use the server API.\
+Prices refresh every five seconds.\
+Click column headers to sort and use **Reset sort** to restore the default order.
 
-The development proxy forwards `/api` to port 8080. To use another API address:
+The development proxy forwards `/api` to port 8080. (see vite.config.ts for the default proxy target)
 
+To use another API address:
 ```bash
 API_PROXY_TARGET=http://localhost:18080 npm --prefix frontend run dev
 ```
-
-Frontend checks: `npm --prefix frontend test` and `npm --prefix frontend run build`.
 
 ## API
 
