@@ -101,14 +101,27 @@ PRICING_BASE_URL=http://localhost:18081 ./gradlew :catalog-api:bootRun
 ```
 
 `PRICING_SYNC_INTERVAL` changes the poll interval; `PRICING_ENABLED=false` disables it.
+
+#### Data consistency
 - Prices and the source watermark commit together.
 - Failed requests/writes leave the cursor unchanged.
-- older/equal price timestamps are ignored.
+- Older/equal price timestamps are ignored.
 - Whole-batch rollback for database errors or unknown SKUs.
+
+#### Failure handling
 - After a failure, the next scheduled poll tries again.
+- Timeouts: 1 second to connect, 2 seconds to read.
+- Retries: up to three attempts for connection errors, timeouts, and HTTP 5xx responses.
+  - Wait 200 ms before the second attempt and 400 ms before the third.
+  - HTTP 4xx responses and database writes are not retried.
+- Circuit breaker: after three failed polls, pause requests for 30 seconds, then allow a recovery attempt.
+- Configuration: override these environment variables using durations such as `2s`:
+  - `PRICING_CONNECT_TIMEOUT`
+  - `PRICING_READ_TIMEOUT`
+  - `PRICING_RETRY_DELAY`
+  - `PRICING_CIRCUIT_OPEN_DURATION`
 
 #### Future improvements — multiple instances
-
 Run one catalog instance for this demo. To support multiple instances:
 - Make sure only one instance runs price synchronization at a time.
 - Let another instance take over if that instance stops.
