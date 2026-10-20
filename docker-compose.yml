@@ -23,8 +23,7 @@ services:
       - "127.0.0.1:${MOCK_PRICING_PORT:-8081}:8081"
     environment:
       PRICING_CHANGE_INTERVAL: ${PRICING_CHANGE_INTERVAL:-5s}
-
-
+  catalog-api:
     build:
       context: .
       dockerfile: catalog-api/Dockerfile
