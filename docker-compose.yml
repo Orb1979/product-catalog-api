@@ -15,5 +15,14 @@ services:
       timeout: 3s
       retries: 10
 
+  mock-pricing:
+    build:
+      context: .
+      dockerfile: mock-pricing-system/Dockerfile
+    ports:
+      - "127.0.0.1:${MOCK_PRICING_PORT:-8081}:8081"
+    environment:
+      PRICING_CHANGE_INTERVAL: ${PRICING_CHANGE_INTERVAL:-5s}
+
 volumes:
   catalog-data:

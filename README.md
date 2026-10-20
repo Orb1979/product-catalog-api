@@ -32,7 +32,20 @@ Run a single module's tests:
 Start PostgreSQL and wait until it is healthy:
 
 ```bash
+# start containers
 docker compose up -d --wait postgres
+```
+
+stop containers or processes on ports 8080 and 8081 (if necessary):
+```
+# stop containers
+docker-compose down
+
+# stop containers and remove volumes
+docker-compose down -v
+
+# kill any processes on ports 8080 and 8081
+lsof -ti :8080,8081 | xargs kill -9
 ```
 
 In separate terminals:
@@ -49,7 +62,7 @@ The catalog applies Flyway migrations on startup and validates its JPA mapping a
 The database includes 10,000 demo products.
 The pricing synchronization cursor starts at the Unix epoch.
 
-### API
+## API
 
 ```bash
 curl 'http://localhost:8080/api/products?page=0&size=20'
@@ -92,16 +105,31 @@ PostgreSQL is published on loopback (`127.0.0.1:5432`).
 Set the same environment variables if you need to override credentials
 (PostgreSQL initialization variables only take effect when the data volume is first created)
 
-```
-# start containers
-docker-compose up -d
+## Mock pricing system
 
-# stop containers
-docker-compose down
+Run it locally with `:mock-pricing-system:bootRun` (above), or in Docker:
 
-# stop containers and remove volumes
-docker-compose down -v
+```bash
+docker compose up -d --build mock-pricing
+curl http://localhost:8081/api/prices
+curl 'http://localhost:8081/api/prices?since=2026-01-01T12:00:00Z'
 ```
+
+Do not run the local and containerized mock together on port 8081. \
+If that port is occupied, use `MOCK_PRICING_PORT=18081 docker compose up -d mock-pricing`
+and access the containerized mock on port 18081 instead.
+
+The mock seeds 10,000 EUR prices and increases the first 10 SKUs by €0.10 every
+five seconds. (`PRICING_CHANGE_INTERVAL`) 
+Its in-memory prices reset on restart.
+
+Responses contain `watermark` and `changes` (`sku`, `price`, `currency`, `updatedAt`). \
+Omitting `since` loads all prices. \
+For subsequent requests, use the previous response's **watermark**, not the client clock. 
+
+Timestamps use microsecond precision to match PostgreSQL. \
+Invalid timestamps or cursors ahead of the source watermark return 400.
+
 
 ### Authentication
 
