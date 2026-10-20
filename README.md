@@ -49,6 +49,17 @@ The catalog applies Flyway migrations on startup and validates its JPA mapping a
 The database includes 10,000 demo products.
 The pricing synchronization cursor starts at the Unix epoch.
 
+### API
+
+```bash
+curl 'http://localhost:8080/api/products?page=0&size=20'
+curl http://localhost:8080/api/products/SKU-000001
+```
+
+Pages are zero-based, sorted by SKU, and limited to 100 products (default 20).
+Missing products return 404; invalid pagination returns 400, both as ProblemDetail.
+Swagger UI: http://localhost:8080/swagger-ui/index.html
+
 ### Database configuration
 
 | Variable | Default | Purpose |
