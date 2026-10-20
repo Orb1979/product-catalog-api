@@ -3,8 +3,8 @@
 A product catalog assignment built incrementally as two Spring Boot applications.
 
 ## Requirements
-- JDK 21
-- Docker with a running daemon (for PostgreSQL and Testcontainers tests)
+- JDK 21 (for local development and Gradle tests)
+- Docker with Compose and a running daemon
 
 ## Modules
 
@@ -27,25 +27,41 @@ Run a single module's tests:
 ./gradlew :mock-pricing-system:test
 ```
 
+## Run with Docker
+
+```bash
+docker compose up --build
+```
+
+This starts PostgreSQL, the mock pricing system, and the catalog API. The catalog
+waits for PostgreSQL to be healthy, applies migrations, and then starts polling
+prices. Products may have null prices until the first sync finishes.
+
+- Catalog API: http://localhost:8080/api/products
+- Swagger UI: http://localhost:8080/swagger-ui/index.html
+- Mock pricing: http://localhost:8081/api/prices
+
+Stop the stack with `docker compose down`. Database data stays in its named volume.
+If ports are occupied, set `CATALOG_PORT`, `MOCK_PRICING_PORT`, or `DB_PORT`, for example:
+
+```bash
+CATALOG_PORT=18080 MOCK_PRICING_PORT=18081 DB_PORT=55432 docker compose up --build
+```
+
+These overrides only change host ports; containers use the internal service addresses.
+
 ## Run locally
+
+If switching from the full Docker stack, stop its application containers first:
+
+```bash
+docker compose stop catalog-api mock-pricing
+```
 
 Start PostgreSQL and wait until it is healthy:
 
 ```bash
-# start containers
 docker compose up -d --wait postgres
-```
-
-stop containers or processes on ports 8080 and 8081 (if necessary):
-```
-# stop containers
-docker-compose down
-
-# stop containers and remove volumes
-docker-compose down -v
-
-# kill any processes on ports 8080 and 8081
-lsof -ti :8080,8081 | xargs kill -9
 ```
 
 In separate terminals:
