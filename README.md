@@ -12,6 +12,7 @@ A product catalog assignment built incrementally as two Spring Boot applications
 | --- | --- | --- |
 | `catalog-api` | Product catalog REST API | 8080 |
 | `mock-pricing-system` | Mock external pricing system | 8081 |
+| `frontend` | React product table (local development) | 5173 |
 
 
 ## Build and test
@@ -77,6 +78,34 @@ In separate terminals:
 The catalog applies Flyway migrations on startup and validates its JPA mapping against the schema. 
 The database includes 10,000 demo products.
 The pricing synchronization cursor starts at the Unix epoch.
+
+## Frontend (local development)
+
+Requires Node.js 22.12 or newer. 
+Start the catalog API locally or in Docker,
+then run the frontend separately:
+
+```bash
+cd frontend
+# install dependencies (only once) 
+npm install
+# run the development server
+npm run dev
+# run tests
+npm test
+```
+
+Open http://localhost:5173. Search, sorting, and pagination use the server API;
+prices refresh every five seconds. Click column headers to sort and use **Reset
+sort** to restore the default order.
+
+The development proxy forwards `/api` to port 8080. To use another API address:
+
+```bash
+API_PROXY_TARGET=http://localhost:18080 npm --prefix frontend run dev
+```
+
+Frontend checks: `npm --prefix frontend test` and `npm --prefix frontend run build`.
 
 ## API
 
