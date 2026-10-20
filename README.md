@@ -91,6 +91,39 @@ To check search response time locally:
 curl -s -o /dev/null -w '%{time_total}s\n' 'http://localhost:8080/api/products?q=blue%20jacket'
 ```
 
+### Price synchronization
+
+The catalog polls the mock every five seconds and persists prices automatically.
+Set `PRICING_BASE_URL` if the mock is on a different address, for example:
+
+```bash
+PRICING_BASE_URL=http://localhost:18081 ./gradlew :catalog-api:bootRun
+```
+
+`PRICING_SYNC_INTERVAL` changes the poll interval; `PRICING_ENABLED=false` disables it.
+- Prices and the source watermark commit together.
+- Failed requests/writes leave the cursor unchanged.
+- older/equal price timestamps are ignored.
+- Whole-batch rollback for database errors or unknown SKUs.
+- After a failure, the next scheduled poll tries again.
+
+#### Future improvements — multiple instances
+
+Run one catalog instance for this demo. To support multiple instances:
+- Make sure only one instance runs price synchronization at a time.
+- Let another instance take over if that instance stops.
+- Prevent older sync results from replacing newer progress.
+
+These checks would go in PricingSyncService.applyChanges()
+(after reading and locking the saved sync state and before updating any prices.)
+- Check whether another instance has already synced
+  - Compare the cursor (timestamp) with the cursor currently saved in the database.
+- Discard an outdated result
+  - If those cursors differ, stop processing that response.
+  - The next scheduled run reads the latest saved cursor automatically.
+- Keep the check and updates together
+  - Perform the comparison inside the existing @Transactional method while holding the existing row lock.
+
 ### Database configuration
 
 | Variable | Default | Purpose |

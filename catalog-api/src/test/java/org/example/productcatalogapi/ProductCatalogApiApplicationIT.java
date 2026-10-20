@@ -12,7 +12,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest
+@SpringBootTest(properties = "pricing.enabled=false")
 @Testcontainers
 class ProductCatalogApiApplicationIT {
 
