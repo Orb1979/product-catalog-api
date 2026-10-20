@@ -212,7 +212,7 @@ Set the same environment variables if you need to override credentials
 
 ## Mock pricing system
 
-Run it locally with `:mock-pricing-system:bootRun` (above), or in Docker:
+Run it locally or in Docker:
 
 ```bash
 docker compose up -d --build mock-pricing
@@ -224,13 +224,12 @@ Do not run the local and containerized mock together on port 8081. \
 If that port is occupied, use `MOCK_PRICING_PORT=18081 docker compose up -d mock-pricing`
 and access the containerized mock on port 18081 instead.
 
-The mock seeds 10,000 EUR prices and increases the first 10 SKUs by €0.10 every
+- The mock seeds 10,000 EUR prices and increases the first 10 SKUs by €0.10 every
 five seconds. (`PRICING_CHANGE_INTERVAL`) 
-Its in-memory prices reset on restart.
-
-Responses contain `watermark` and `changes` (`sku`, `price`, `currency`, `updatedAt`). \
-Omitting `since` loads all prices. \
-For subsequent requests, use the previous response's **watermark**, not the client clock. 
+- Its in-memory prices reset on restart.
+- Responses contain `watermark` and `changes` (`sku`, `price`, `currency`, `updatedAt`). \
+- Omitting `since` loads all prices.
+- For subsequent requests, use the previous response's **watermark** 
 
 Timestamps use microsecond precision to match PostgreSQL. \
 Invalid timestamps or cursors ahead of the source watermark return 400.
