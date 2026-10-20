@@ -4,6 +4,7 @@ A product catalog assignment built incrementally as two Spring Boot applications
 
 ## Requirements
 - JDK 21
+- Docker with a running daemon (for PostgreSQL and Testcontainers tests)
 
 ## Modules
 
@@ -28,6 +29,12 @@ Run a single module's tests:
 
 ## Run locally
 
+Start PostgreSQL and wait until it is healthy:
+
+```bash
+docker compose up -d --wait postgres
+```
+
 In separate terminals:
 
 ```bash
@@ -38,10 +45,40 @@ In separate terminals:
 ./gradlew :catalog-api:bootRun
 ```
 
+The catalog applies Flyway migrations on startup and validates its JPA mapping against the schema. 
+The database includes 10,000 demo products.
+The pricing synchronization cursor starts at the Unix epoch.
+
+### Database configuration
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `DB_URL` | `jdbc:postgresql://localhost:5432/catalog` | Catalog JDBC URL |
+| `DB_PORT` | `5432` | Compose host port and default catalog JDBC port |
+| `DB_USER` | `catalog` | Catalog and Compose database user |
+| `DB_PASSWORD` | `catalog` | Catalog and Compose database password |
+
+The defaults are local demo credentials only, not production secrets.
+PostgreSQL is published on loopback (`127.0.0.1:5432`). 
+Set the same environment variables if you need to override credentials
+(PostgreSQL initialization variables only take effect when the data volume is first created)
+
+```
+# start containers
+docker-compose up -d
+
+# stop containers
+docker-compose down
+
+# stop containers and remove volumes
+docker-compose down -v
+```
+
+### Authentication
+
 Applications are currently unauthenticated. For this local assignment demo,
 bind them to loopback when running outside an isolated development environment:
 
 ```bash
 SERVER_ADDRESS=127.0.0.1 ./gradlew :catalog-api:bootRun
 ```
-
