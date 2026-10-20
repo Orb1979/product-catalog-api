@@ -3,8 +3,10 @@ package org.example.productcatalogapi.search;
 import java.util.List;
 import java.util.Map;
 
+import org.example.productcatalogapi.dto.ProductResponse;
 import org.example.productcatalogapi.model.Product;
 import org.example.productcatalogapi.repository.ProductRepository;
+import org.example.productcatalogapi.service.ProductService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
@@ -12,8 +14,10 @@ import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
@@ -22,6 +26,7 @@ import org.testcontainers.postgresql.PostgreSQLContainer;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @DataJpaTest(properties = "spring.jpa.hibernate.ddl-auto=validate")
+@Import(ProductService.class)
 @Testcontainers
 class ProductSearchTest {
 
@@ -31,11 +36,13 @@ class ProductSearchTest {
 
     private final ProductRepository repository;
     private final JdbcTemplate jdbc;
+    private final ProductService service;
 
     @Autowired
-    ProductSearchTest(ProductRepository repository, JdbcTemplate jdbc) {
+    ProductSearchTest(ProductRepository repository, JdbcTemplate jdbc, ProductService service) {
         this.repository = repository;
         this.jdbc = jdbc;
+        this.service = service;
     }
 
     @ParameterizedTest
@@ -98,6 +105,64 @@ class ProductSearchTest {
     private boolean matchesSearch(String sku, String term) {
         return repository.search(term, PageRequest.of(0, 20)).getContent().stream()
                 .anyMatch(product -> product.getSku().equals(sku));
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "asc,,TEST-B,TEST-A,10003",
+            "desc,,TEST-A,TEST-B,10003",
+            "asc,sorttest,TEST-B,TEST-A,3",
+            "desc,sorttest,TEST-A,TEST-B,3"
+    })
+    void shouldSortPricesBeforePaginationForBrowsingAndSearching(
+            String direction, String query, String firstSku, String secondSku, int total) {
+        seedSortableProducts();
+        Sort sort = Sort.by(Sort.Direction.fromString(direction), "price");
+
+        Page<ProductResponse> first = service.getProducts(query, 0, 1, sort);
+        Page<ProductResponse> second = service.getProducts(query, 1, 1, sort);
+
+        assertThat(first.getContent()).extracting(ProductResponse::sku).containsExactly(firstSku);
+        assertThat(second.getContent()).extracting(ProductResponse::sku).containsExactly(secondSku);
+        assertThat(first.getTotalElements()).isEqualTo(total);
+        assertThat(second.getTotalElements()).isEqualTo(total);
+        assertThat(service.getProducts("sorttest", 2, 1, sort).getContent())
+                .extracting(ProductResponse::sku).containsExactly("TEST-C");
+    }
+
+    @ParameterizedTest
+    @CsvSource({
+            "sku,TEST-A,TEST-B,TEST-C",
+            "name,TEST-B,TEST-C,TEST-A",
+            "description,TEST-B,TEST-C,TEST-A",
+            "brand,TEST-B,TEST-C,TEST-A",
+            "category,TEST-B,TEST-C,TEST-A",
+            "attributes,TEST-B,TEST-C,TEST-A",
+            "currency,TEST-B,TEST-A,TEST-C",
+            "priceUpdatedAt,TEST-B,TEST-A,TEST-C"
+    })
+    void shouldSupportEveryOtherColumnWithStableSkuTieBreaker(
+            String field, String first, String second, String third) {
+        seedSortableProducts();
+
+        Page<ProductResponse> results = service.getProducts("sorttest", 0, 20, Sort.by(field));
+
+        assertThat(results.getContent()).extracting(ProductResponse::sku).containsExactly(first, second, third);
+    }
+
+    private void seedSortableProducts() {
+        repository.saveAllAndFlush(List.of(
+                new Product("TEST-A", "Zebra mug", "sorttest Zulu", "Zed", "Travel", Map.of("color", "zebra")),
+                new Product("TEST-B", "Apple mug", "sorttest Alpha", "Alpha", "Kitchen", Map.of("color", "apple")),
+                new Product("TEST-C", "Apple mug", "sorttest Alpha", "Alpha", "Kitchen", Map.of("color", "apple"))));
+        jdbc.update("""
+                UPDATE products SET price = 25.00, currency = 'USD', price_updated_at = '2026-01-01T00:00:00Z'
+                WHERE sku = 'TEST-A'
+                """);
+        jdbc.update("""
+                UPDATE products SET price = 5.00, currency = 'EUR', price_updated_at = '2025-01-01T00:00:00Z'
+                WHERE sku = 'TEST-B'
+                """);
     }
 
     private void seedSearchProduct() {

@@ -53,7 +53,7 @@ class ProductServiceTest {
         Product product = new Product("SKU-000011", "Lamp", null, null, null, Map.of());
         when(repository.findAll(request)).thenReturn(new PageImpl<>(List.of(product), request, 21));
 
-        Page<ProductResponse> response = service.getProducts(query, 1, 10);
+        Page<ProductResponse> response = service.getProducts(query, 1, 10, Sort.unsorted());
 
         assertThat(response.getContent()).extracting(ProductResponse::sku).containsExactly("SKU-000011");
         assertThat(response.getNumber()).isEqualTo(1);
@@ -66,7 +66,7 @@ class ProductServiceTest {
         Product product = new Product("SKU-000001", "Lamp", null, null, null, Map.of());
         when(repository.search("lamp", request)).thenReturn(new PageImpl<>(List.of(product)));
 
-        Page<ProductResponse> response = service.getProducts("  lamp  ", 0, 20);
+        Page<ProductResponse> response = service.getProducts("  lamp  ", 0, 20, Sort.unsorted());
 
         assertThat(response.getContent()).extracting(ProductResponse::sku).containsExactly("SKU-000001");
     }

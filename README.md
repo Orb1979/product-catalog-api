@@ -83,13 +83,20 @@ The pricing synchronization cursor starts at the Unix epoch.
 ```bash
 curl 'http://localhost:8080/api/products?page=0&size=20'
 curl 'http://localhost:8080/api/products?q=blue%20jacket&page=0&size=20'
+curl 'http://localhost:8080/api/products?q=lamp&sort=price&direction=asc&page=0&size=20'
 curl http://localhost:8080/api/products/SKU-000001
 ```
 
 Pages are zero-based and limited to 100 products (default 20).
 
-Without `q`, or with blank input, products are sorted by SKU. Searches are ranked by relevance, then SKU. 
+By default, blank searches list products by SKU; searches with `q` are ranked by relevance, then SKU.
 Search covers name, brand, category, description, and JSON attribute keys/values, not SKU, price, or currency.
+
+Use `sort` to order all matching products before pagination; `direction` is `asc`
+(default) or `desc`. Supported fields: `sku`, `name`, `description`, `brand`,
+`category`, `attributes`, `price`, `currency`, and `priceUpdatedAt`.
+Missing values sort last in either direction; equal values are ordered by SKU.
+Attributes sort by their stored JSON text. Invalid sorting parameters return 400.
 
 #### PostgreSQL’s full-text search functions
 Search is case-insensitive and token-based (not substring or typo matching). Words are combined with AND.\

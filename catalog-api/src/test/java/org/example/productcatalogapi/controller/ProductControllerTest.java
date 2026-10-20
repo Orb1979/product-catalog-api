@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -39,7 +40,7 @@ class ProductControllerTest {
 
     @Test
     void shouldReturnDefaultProductPage() throws Exception {
-        when(service.getProducts(null, 0, 20)).thenReturn(
+        when(service.getProducts(null, 0, 20, Sort.unsorted())).thenReturn(
                 new PageImpl<>(List.of(PRODUCT), PageRequest.of(0, 20), 1));
 
         mvc.perform(get("/api/products"))
@@ -51,11 +52,12 @@ class ProductControllerTest {
     }
 
     @Test
-    void shouldPassSearchQueryAndPaginationToService() throws Exception {
-        when(service.getProducts("lamp", 1, 2)).thenReturn(
+    void shouldPassSearchQueryPaginationAndSortToService() throws Exception {
+        when(service.getProducts("lamp", 1, 2, Sort.by(Sort.Direction.DESC, "price"))).thenReturn(
                 new PageImpl<>(List.of(PRODUCT), PageRequest.of(1, 2), 3));
 
-        mvc.perform(get("/api/products").param("q", "lamp").param("page", "1").param("size", "2"))
+        mvc.perform(get("/api/products").param("q", "lamp").param("page", "1").param("size", "2")
+                        .param("sort", "price").param("direction", "desc"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].sku").value("SKU-000001"))
                 .andExpect(jsonPath("$.page.number").value(1))
@@ -91,6 +93,16 @@ class ProductControllerTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
                 .andExpect(jsonPath("$.status").value(400));
+
+        verifyNoInteractions(service);
+    }
+
+    @ParameterizedTest
+    @CsvSource({"unknown,asc", "price; DROP TABLE products,asc", "price,sideways", "price,desc; SELECT 1"})
+    void shouldRejectUnsupportedSortFieldsAndDirections(String sort, String direction) throws Exception {
+        mvc.perform(get("/api/products").param("sort", sort).param("direction", direction))
+                .andExpect(status().isBadRequest())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
 
         verifyNoInteractions(service);
     }

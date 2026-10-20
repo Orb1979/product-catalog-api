@@ -23,6 +23,17 @@ public interface ProductRepository extends JpaRepository<Product, String> {
             """, nativeQuery = true)
     Page<Product> search(@Param("query") String query, Pageable pageable);
 
+    @Query(value = """
+            SELECT p.*, CAST(p.attributes AS text) AS attributes_sort FROM products p
+            WHERE CAST(:query AS text) IS NULL
+               OR p.search_vector @@ websearch_to_tsquery('simple', :query)
+            """, countQuery = """
+            SELECT count(*) FROM products p
+            WHERE CAST(:query AS text) IS NULL
+               OR p.search_vector @@ websearch_to_tsquery('simple', :query)
+            """, nativeQuery = true)
+    Page<Product> findSorted(@Param("query") String query, Pageable pageable);
+
     @Modifying
     @Query(value = """
             UPDATE products
