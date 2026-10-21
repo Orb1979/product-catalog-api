@@ -243,3 +243,126 @@ bind them to loopback when running outside an isolated development environment:
 ```bash
 SERVER_ADDRESS=127.0.0.1 ./gradlew :catalog-api:bootRun
 ```
+
+
+##  Polling flow
+```
+Spring scheduler
+    |
+    v
+PricingSyncJob.syncPrices()
+    |
+    +--> PricingSyncService.getCursor()
+    |        |
+    |        +--> Read last successful watermark from PostgreSQL
+    |
+    +--> PricingClient.getChanges(cursor)
+    |        |
+    |        +--> Circuit breaker -> Retry -> HTTP GET
+    |                                          |
+    |                                          v
+    |                            Mock: PricingController.getChanges()
+    |                                          |
+    |                                          v
+    |                            Mock: PricingService.getChanges()
+    |                                          |
+    |        <--------- JSON: watermark + price changes
+    |
+    +--> PricingSyncService.applyChanges(cursor, response)
+             |
+             +--> Validate and update prices
+             +--> Save the new watermark
+             +--> Commit both together in PostgreSQL
+
+
+Wait 5 seconds after completion, then repeat.
+```
+
+## Local development
+```
+HOST MACHINE
+
+  +---------------------------+
+  | Browser                   |
+  | React UI                  |
+  | http://localhost:5173     |
+  +-------------+-------------+
+                |
+                | Frontend assets and /api requests
+                v
+  +---------------------------+
+  | Vite development server   |
+  | localhost:5173            |
+  +-------------+-------------+
+                |
+                | /api proxy -> http://localhost:8080
+                v
+  +---------------------------+       +---------------------------+
+  | Catalog API               | ----> | Mock pricing system       |
+  | Spring Boot               |       | Spring Boot               |
+  | localhost:8080            |       | localhost:8081            |
+  +-------------+-------------+       | In-memory prices          |
+                |                     +---------------------------+
+                |                       GET /api/prices?since=...
+                |                       Catalog pulls every 5s
+                |
+                | JDBC -> localhost:5432
+                v
+  +-------------------------------------------------------------+
+  | DOCKER                                                      |
+  |                                                             |
+  |  +---------------------------+                              |
+  |  | PostgreSQL 17             |                              |
+  |  | Container port: 5432      |                              |
+  |  | Host port: 5432           |                              |
+  |  | Products + sync cursor    |                              |
+  |  +-------------+-------------+                              |
+  |                |                                            |
+  |                v                                            |
+  |       Named volume: catalog-data                            |
+  +-------------------------------------------------------------+
+
+```
+## Docker Compose
+```
+HOST MACHINE
+  +---------------------------+
+  | Browser                   |
+  | React UI                  |
+  | http://localhost:3000     |
+  +-------------+-------------+
+                |
+                | Host port 3000 -> frontend container port 8080
+                v
+  +---------------------------------------------------------------------+
+  | DOCKER COMPOSE NETWORK                                              |
+  |                                                                     |
+  |  +---------------------------+                                      |
+  |  | frontend                  |                                      |
+  |  | Non-root Nginx :8080      |                                      |
+  |  | Production React assets  |                                       |
+  |  +-------------+-------------+                                      |
+  |                |                                                    |
+  |                | /api proxy -> http://catalog-api:8080              |
+  |                v                                                    |
+  |  +---------------------------+       +---------------------------+  |
+  |  | catalog-api               | ----> | mock-pricing              |  |
+  |  | Spring Boot :8080         |       | Spring Boot :8081         |  |
+  |  +-------------+-------------+       | In-memory prices          |  |
+  |                |                     +---------------------------+  |
+  |                |                       GET /api/prices?since=...    |
+  |                |                       Catalog pulls every 5s       |
+  |                |                                                    |
+  |                | JDBC -> postgres:5432/catalog                      |
+  |                v                                                    |
+  |  +---------------------------+                                      |
+  |  | postgres                  |                                      |
+  |  | PostgreSQL 17 :5432       |                                      |
+  |  | Products + sync cursor    |                                      |
+  |  +-------------+-------------+                                      |
+  |                |                                                    |
+  |                v                                                    |
+  |       Named volume: catalog-data                                    |
+  +---------------------------------------------------------------------+
+
+```  
